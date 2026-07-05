@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: voiceover-mcp-server
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: HOST
+        value: 0.0.0.0
+      # PORT is auto-injected by Render at runtime - do not set it here.
+      - key: TEMP_DIR
+        value: ""
+      - key: AUDIO_TTL_SECONDS
+        value: "600"
+      - key: DEFAULT_VOICE
+        value: en-IN-PrabhatNeural
+      - key: DEFAULT_RATE
+        value: "+0%"
+      - key: DEFAULT_PITCH
+        value: "+0Hz"
+      - key: DEFAULT_VOLUME
+        value: "+0%"
+      - key: MAX_LOG_ENTRIES
+        value: "1000"
