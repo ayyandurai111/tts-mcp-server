@@ -22,6 +22,7 @@ async def root():
             "rest_tts": "POST /api/v1/tts",
             "rest_voices": "GET /api/v1/voices",
             "rest_audio": "GET /api/v1/audio/{filename}",
+            "rest_visual": "GET /api/v1/visual/{filename}",
             "health": "GET /health",
             "docs": "/docs",
         },

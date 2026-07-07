@@ -9,20 +9,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.routing import Route
 
-from app.config import APP_TITLE, APP_VERSION, HOST, PORT, TEMP_DIR
-from app.core.files import cleanup_expired_files
+from app.config import APP_TITLE, APP_VERSION, HOST, PORT, TEMP_DIR, VISUALS_DIR
+from app.core.files import cleanup_expired_files, cleanup_expired_visuals
 from app.mcp.sse_asgi import handle_post_message, sse_endpoint
 from app.mcp.streamable_http_asgi import http_session_manager, streamable_http_app
-from app.routes import audio, logs, root, tts, voices
+from app.routes import audio, logs, root, tts, visuals, voices
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     removed = cleanup_expired_files()
+    removed_visuals = cleanup_expired_visuals()
     print(f"VoiceOver MCP Server starting on http://{HOST}:{PORT}", file=sys.stderr)
     print(f"Temp audio directory: {TEMP_DIR}", file=sys.stderr)
+    print(f"Temp visuals directory: {VISUALS_DIR}", file=sys.stderr)
     if removed:
         print(f"Cleaned up {removed} expired audio file(s) on startup", file=sys.stderr)
+    if removed_visuals:
+        print(f"Cleaned up {removed_visuals} expired visual(s) on startup", file=sys.stderr)
 
     # The Streamable HTTP session manager needs its task group running for
     # the lifetime of the app - without this, handle_request() raises
@@ -53,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(tts.router)
     app.include_router(voices.router)
     app.include_router(audio.router)
+    app.include_router(visuals.router)
     app.include_router(logs.router)
 
     # --- MCP transports: mounted as raw ASGI (bypasses FastAPI's response

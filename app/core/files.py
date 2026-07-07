@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from app.config import AUDIO_TTL_SECONDS, TEMP_DIR
+from app.config import AUDIO_TTL_SECONDS, TEMP_DIR, VISUAL_TTL_SECONDS, VISUALS_DIR
 
 # Only allow safe characters in a user-supplied filename.
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -49,6 +49,29 @@ def cleanup_expired_files(ttl_seconds: int = AUDIO_TTL_SECONDS) -> int:
     removed = 0
     now = time.time()
     for f in TEMP_DIR.glob("*.mp3"):
+        try:
+            if now - f.stat().st_mtime > ttl_seconds:
+                f.unlink(missing_ok=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def resolve_visual_path(filename: str) -> Path:
+    """Resolve a filename to a path inside the visuals temp directory.
+
+    Guards against path traversal by only ever using the basename.
+    """
+    safe_name = Path(filename).name
+    return VISUALS_DIR / safe_name
+
+
+def cleanup_expired_visuals(ttl_seconds: int = VISUAL_TTL_SECONDS) -> int:
+    """Delete temp SVG screenshots older than ttl_seconds. Returns count removed."""
+    removed = 0
+    now = time.time()
+    for f in VISUALS_DIR.glob("*.svg"):
         try:
             if now - f.stat().st_mtime > ttl_seconds:
                 f.unlink(missing_ok=True)

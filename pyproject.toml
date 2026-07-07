@@ -1,7 +1,7 @@
 [project]
 name = "voiceover-mcp-server"
 version = "3.0.0"
-description = "Text-to-speech MCP server (SSE) with REST API, single voice_over tool, temp-storage backed."
+description = "MCP server (Streamable HTTP + legacy SSE) with REST API: voice_over (text-to-speech) and visual_creator (coding-vlog code/terminal screenshots), both temp-storage backed."
 requires-python = ">=3.10"
 
 [tool.pytest.ini_options]

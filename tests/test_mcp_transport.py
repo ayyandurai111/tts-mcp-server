@@ -48,7 +48,7 @@ async def test_mcp_transport_wiring():
             assert init_resp.status_code == 200
             assert init_resp.json()["result"]["serverInfo"]["name"] == "voiceover-mcp-server"
 
-            # Must expose exactly the voice_over tool.
+            # Must expose both registered tools.
             tools_resp = await client.post(
                 "/mcp",
                 json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
@@ -56,8 +56,7 @@ async def test_mcp_transport_wiring():
             )
             assert tools_resp.status_code == 200
             tools = tools_resp.json()["result"]["tools"]
-            assert len(tools) == 1
-            assert tools[0]["name"] == "voice_over"
+            assert {t["name"] for t in tools} == {"voice_over", "visual_creator"}
 
             # --- Legacy SSE transport (/mcp/messages) ---
 

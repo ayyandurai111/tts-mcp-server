@@ -34,8 +34,19 @@ TEMP_DIR: Path = (
 )
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
+# visual_creator's generated SVG screenshots get their own flat subfolder of
+# the same ephemeral temp dir, so they can be swept on their own TTL without
+# touching audio files.
+VISUALS_DIR: Path = TEMP_DIR / "visuals"
+VISUALS_DIR.mkdir(parents=True, exist_ok=True)
+
 # How long generated files are allowed to live before cleanup sweeps them.
 AUDIO_TTL_SECONDS: int = int(os.environ.get("AUDIO_TTL_SECONDS", 3600))
+
+# visual_creator (vlogshot) screenshots land in the same ephemeral temp dir
+# as audio - same PaaS reasoning applies. Kept as a separate constant so the
+# TTL can be tuned independently if needed.
+VISUAL_TTL_SECONDS: int = int(os.environ.get("VISUAL_TTL_SECONDS", 3600))
 
 # ---------------------------------------------------------------------------
 # TTS defaults

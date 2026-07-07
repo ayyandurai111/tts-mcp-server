@@ -11,11 +11,17 @@ from app.mcp.tools import handle_list_tools
 
 
 @pytest.mark.asyncio
-async def test_list_tools_exposes_single_voice_over_tool():
+async def test_list_tools_exposes_voice_over_and_visual_creator():
     tools = await handle_list_tools()
-    assert len(tools) == 1
-    assert tools[0].name == "voice_over"
-    assert "text" in tools[0].inputSchema["properties"]
+    names = {t.name for t in tools}
+    assert names == {"voice_over", "visual_creator"}
+
+    voice_over = next(t for t in tools if t.name == "voice_over")
+    assert "text" in voice_over.inputSchema["properties"]
+
+    visual_creator = next(t for t in tools if t.name == "visual_creator")
+    assert "checklist" in visual_creator.inputSchema["properties"]
+    assert visual_creator.inputSchema["required"] == ["checklist"]
 
 
 async def _fake_generate_audio_core(text, output_path: Path, **kwargs):
@@ -70,3 +76,51 @@ async def test_unknown_tool_name_returns_error():
     payload = json.loads(result[0].text)
     assert payload["success"] is False
     assert "Unknown tool" in payload["error"]
+
+
+@pytest.mark.asyncio
+async def test_visual_creator_inline_code_entry_needs_no_zip(tmp_path):
+    with patch("app.mcp.handlers.VISUALS_DIR", tmp_path):
+        result = await handle_call_tool(
+            "visual_creator",
+            {
+                "checklist": [
+                    {
+                        "path": "app/core/tts.py",
+                        "start_line": 1,
+                        "code": "def f():\n    return 1\n",
+                        "label": "sample function",
+                    }
+                ]
+            },
+        )
+
+    payload = json.loads(result[0].text)
+    assert payload["success"] is True
+    assert len(payload["files"]) == 1
+    assert payload["files"][0].endswith(".svg")
+    assert (tmp_path / payload["files"][0]).exists()
+    assert payload["results"][0]["status"] == "OK"
+
+
+@pytest.mark.asyncio
+async def test_visual_creator_requires_zip_for_zip_lookup_entry():
+    result = await handle_call_tool(
+        "visual_creator",
+        {
+            "checklist": [
+                {"file": "app/core/tts.py", "start_line": 1, "end_line": 5}
+            ]
+        },
+    )
+    payload = json.loads(result[0].text)
+    assert payload["success"] is False
+    assert "zip_base64" in payload["error"]
+
+
+@pytest.mark.asyncio
+async def test_visual_creator_rejects_empty_checklist():
+    result = await handle_call_tool("visual_creator", {"checklist": []})
+    payload = json.loads(result[0].text)
+    assert payload["success"] is False
+    assert "checklist" in payload["error"].lower()
