@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.utils.formatting import human_file_size, utc_now_iso
+from common.formatting import human_file_size, utc_now_iso
 
 
 def test_human_file_size_kb():

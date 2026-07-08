@@ -6,6 +6,9 @@ mcp>=1.0.0
 python-multipart>=0.0.9
 pygments>=2.17.0
 pillow>=10.0.0
+resvg-py==0.3.3  # SVG->PNG rasterizer for visual_creator's 4K PNG output (see app/core/rasterize.py)
+mutagen>=1.47.0  # reads MP3 duration for the audio<->visual project sync manifest
+imageio-ffmpeg>=0.5.1  # ships a static ffmpeg binary for video_renderer (no apt-get/Dockerfile needed - see app/config.py)
 
 # Testing
 pytest>=8.0.0

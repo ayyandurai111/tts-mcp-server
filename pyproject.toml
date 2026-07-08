@@ -6,7 +6,7 @@ requires-python = ">=3.10"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["tests", "tools", "mcp_layer", "api"]
 
 [tool.black]
 line-length = 100

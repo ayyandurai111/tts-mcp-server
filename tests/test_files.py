@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.core.files import generate_filename, resolve_temp_path, sanitize_filename
-from app.config import TEMP_DIR
+from common.files import generate_filename, resolve_temp_path, sanitize_filename
+from common.config import TEMP_DIR
 
 
 def test_generate_filename_default_ends_with_mp3():

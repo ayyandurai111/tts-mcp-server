@@ -28,3 +28,15 @@ services:
         value: "+0%"
       - key: MAX_LOG_ENTRIES
         value: "1000"
+      # video_renderer: ffmpeg itself is provisioned via the imageio-ffmpeg
+      # pip package (see requirements.txt + app/config.py), since this is
+      # Render's native Python runtime (buildCommand is a plain pip
+      # install, no apt-get/Dockerfile hook available). FFMPEG_BINARY is
+      # left unset here so it auto-resolves to imageio-ffmpeg's bundled
+      # static binary; only set it if pointing at a different ffmpeg.
+      - key: DEFAULT_TRANSITION
+        value: cut
+      - key: CROSSFADE_SECONDS
+        value: "0.5"
+      - key: RENDER_TIMEOUT_SECONDS
+        value: "600"
