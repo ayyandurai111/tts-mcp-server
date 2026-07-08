@@ -195,7 +195,7 @@ def _process_entry(entry, project_root, file_index, out_dir, theme, font_size,
     snippet was long enough to need pagination onto the fixed canvas).
     """
     if entry.kind == "command":
-        return _process_command_entry(entry, out_dir)
+        return _process_command_entry(entry, out_dir, font_size, image_width, image_height)
     if entry.kind == "inline_code":
         return _process_inline_code_entry(entry, out_dir, theme, font_size, style,
                                            image_width, image_height)
@@ -203,16 +203,21 @@ def _process_entry(entry, project_root, file_index, out_dir, theme, font_size,
                                 font_size, style, image_width, image_height)
 
 
-def _process_command_entry(entry, out_dir):
+def _process_command_entry(entry, out_dir, font_size, image_width, image_height=DEFAULT_IMAGE_HEIGHT):
     slug = slugify(entry.label)
     filename = f"{entry.order:02d}_{slug}.svg"
     out_path = os.path.join(out_dir, filename)
 
     try:
-        render_terminal_screenshot(entry.command, entry.output or "", out_path)
+        fully_fit = render_terminal_screenshot(
+            entry.command, entry.output or "", out_path,
+            font_size=font_size, image_width=image_width, image_height=image_height,
+        )
     except Exception as e:  # noqa: BLE001 - want to keep processing other entries
         return "SKIPPED", f"rendering failed: {e}", []
 
+    if not fully_fit:
+        return "CLIPPED", "output had more lines than fit on the fixed canvas", [out_path]
     return "OK", "", [out_path]
 
 

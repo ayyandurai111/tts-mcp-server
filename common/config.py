@@ -18,6 +18,13 @@ from pathlib import Path
 PORT: int = int(os.environ.get("PORT", 8080))
 HOST: str = os.environ.get("HOST", "0.0.0.0")
 
+# Public base URL for building absolute download links (e.g. video_renderer's
+# "download_url"). Render sets RENDER_EXTERNAL_URL automatically for every
+# web service to its public https://xxx.onrender.com address; BASE_URL lets
+# that be overridden manually (e.g. behind a custom domain). Falls back to
+# "" (relative paths only) if neither is set - e.g. running locally.
+BASE_URL: str = os.environ.get("BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL", "")
+
 # ---------------------------------------------------------------------------
 # Storage
 # ---------------------------------------------------------------------------

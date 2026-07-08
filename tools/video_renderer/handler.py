@@ -6,6 +6,7 @@ import json
 
 from mcp.types import TextContent
 
+from common.config import BASE_URL
 from common.formatting import utc_now_iso
 from common.logging import log_request
 from common.project_store import (
@@ -45,6 +46,9 @@ async def handle(arguments: dict) -> list[TextContent]:
         final_path = save_final_video(project_id, out_path)
         out_path.unlink(missing_ok=True)
 
+        relative_url = f"/api/v1/project/{project_id}/video"
+        download_url = f"{BASE_URL.rstrip('/')}{relative_url}" if BASE_URL else relative_url
+
         result = {
             "success": True,
             "project_id": project_id,
@@ -53,7 +57,7 @@ async def handle(arguments: dict) -> list[TextContent]:
             "transition": outcome["transition"],
             "orders": outcome["orders"],
             "warnings": outcome["warnings"],
-            "download_url": f"/api/v1/project/{project_id}/video",
+            "download_url": download_url,
             "timestamp": utc_now_iso(),
         }
         log_request(name, arguments, result)

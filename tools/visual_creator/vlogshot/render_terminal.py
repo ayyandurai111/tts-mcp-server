@@ -28,7 +28,8 @@ import re
 
 from .svgkit import Svg, load_measure_font
 
-IMAGE_WIDTH = 1200
+IMAGE_WIDTH = 1920
+DEFAULT_IMAGE_HEIGHT = 1080
 DEFAULT_FONT_SIZE = 20  # visually matches "Consolas 16" in a real console
 
 PADDING_X = 10
@@ -157,6 +158,7 @@ def render_terminal_screenshot(
     title=DEFAULT_TITLE,
     font_size=DEFAULT_FONT_SIZE,
     image_width=IMAGE_WIDTH,
+    image_height=DEFAULT_IMAGE_HEIGHT,
 ):
     """
     Render a Windows Command Prompt-style screenshot showing `command`
@@ -167,6 +169,22 @@ def render_terminal_screenshot(
     `cwd_label` defaults to a generic "C:\\Users\\You" and `prompt` to ">",
     matching a real cmd.exe prompt ("C:\\Users\\You>"). `title` is the
     window title bar text (default: "Command Prompt").
+
+    The output canvas is always exactly `image_width` x `image_height` -
+    same fixed-canvas contract as render.py's code screenshots, and for the
+    same reason: a batch of screenshots (code and terminal alike) needs to
+    be video-ready with no size mismatches between clips. Content is drawn
+    from the top with the rest of the canvas left as plain console
+    background, rather than auto-sizing the canvas to the number of output
+    lines (which used to make e.g. a 3-line command result render at
+    3840x448 instead of matching every other screenshot's 3840x2160,
+    forcing video_renderer to stretch it ~5x vertically to fit the video
+    frame). If the output has more lines than fit, the extra lines are
+    clipped (status reported by the caller) rather than shrinking the font
+    or growing past the fixed canvas.
+
+    Returns True if all output lines fit on the canvas, False if any were
+    clipped.
     """
     fs = font_size
     W = image_width
@@ -179,13 +197,18 @@ def render_terminal_screenshot(
     from PIL import Image, ImageDraw
     measure = ImageDraw.Draw(Image.new("RGB", (10, 10)))
 
-    output_lines = output_text.splitlines() if output_text else []
-    # One prompt line + one line per output line (blank output -> just the prompt).
-    num_lines = 1 + len(output_lines)
+    all_output_lines = output_text.splitlines() if output_text else []
 
     body_top = TITLE_BAR_HEIGHT + PADDING_TOP
-    body_height = num_lines * line_height
-    total_height = int(body_top + body_height + PADDING_BOTTOM)
+    available_height = image_height - body_top - PADDING_BOTTOM
+    max_lines = max(1, available_height // line_height)
+
+    # One prompt line + as many output lines as fit on the fixed canvas.
+    max_output_lines = max(0, max_lines - 1)
+    output_lines = all_output_lines[:max_output_lines]
+    fully_fit = len(output_lines) == len(all_output_lines)
+
+    total_height = image_height
 
     svg = Svg()
 
@@ -228,4 +251,4 @@ def render_terminal_screenshot(
     svg_text = svg.render(W, total_height, BACKGROUND)
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(svg_text)
-    return out_path
+    return fully_fit
