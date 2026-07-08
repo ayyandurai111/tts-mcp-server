@@ -273,6 +273,36 @@ def build_render_plan(manifest: dict) -> tuple[list[dict], list[dict]]:
 # Segment + concat rendering
 # ---------------------------------------------------------------------------
 
+def _prescale_image(src_path: Path, width: int, height: int, tmp_dir: Path, tag: str) -> Path:
+    """Decode the source image exactly once and write a small pre-scaled
+    PNG at the segment's target resolution, for `-loop 1` to read
+    repeatedly afterwards.
+
+    This matters a lot in practice: `-loop 1 -i <image>` re-decodes the
+    source image on every looped output frame, not just once. visual_creator
+    rasterizes PNGs at >=4K on the long edge regardless of the manifest's
+    logical width/height (see tools/visual_creator/rasterize.py's
+    MIN_LONG_EDGE_PX), so without this step, every one of the dozens of
+    frames in a segment pays the cost of decoding a full 4K source image,
+    even though the video itself is encoded at a much smaller resolution -
+    measured to push total server process memory dangerously close to (and
+    on a Render free-tier 512MB instance, over) the limit. Pre-scaling once
+    caps every subsequent per-frame decode to the small target size
+    regardless of how large the real source PNG is.
+    """
+    scaled_path = tmp_dir / f"{tag}_scaled.png"
+    _run_ffmpeg(
+        [
+            "-i", str(src_path),
+            "-vf", f"scale={width}:{height}",
+            "-frames:v", "1",
+            str(scaled_path),
+        ],
+        step=f"pre-scale source image for {tag}",
+    )
+    return scaled_path
+
+
 def _render_segment(segment: dict, out_path: Path) -> None:
     """Render one order's segment: its visual page(s) held for the audio
     duration, with that order's audio.mp3 as the segment's audio track.
@@ -285,17 +315,15 @@ def _render_segment(segment: dict, out_path: Path) -> None:
     durations) and the audio-muxing logic each simple and separately
     testable, rather than one large filter graph.
 
+    Every page's source image is pre-scaled once via `_prescale_image`
+    before being looped (see its docstring) - this and the settings below
+    are both aimed at the same problem, still-image encoding wasting
+    CPU/RAM on a memory-constrained deployment:
+
     Encode fps: `-r 2` is given as an *input* option on the looped image
     (before `-i`), not just an output option - since a still screenshot has
     no motion, there's nothing gained from encoding tens of near-identical
-    frames per second, only wasted CPU/RAM. Measured impact on a ~1080p
-    ~20s segment: dropped from ~14s wall time / ~1.1GB peak child RSS at a
-    naive output-only `-r 30` down to ~1-3s / well under 150MB at input-side
-    `-r 2` with `-preset ultrafast` - the difference between comfortably
-    fitting a Render free-tier 512MB instance and reliably getting OOM-killed
-    partway through a render (which surfaces to the caller as a bare
-    connection failure, not a clean VideoRenderError, since the process
-    dies before it can respond).
+    frames per second, only wasted CPU/RAM.
     """
     pages = segment["pages"]
     audio_path = segment["audio_path"]
@@ -303,19 +331,24 @@ def _render_segment(segment: dict, out_path: Path) -> None:
 
     if len(pages) == 1:
         page = pages[0]
-        _run_ffmpeg(
-            [
-                "-loop", "1", "-r", "2", "-i", str(page["image_path"]),
-                "-i", str(audio_path),
-                "-t", f"{page['duration_seconds']:.3f}",
-                "-vf", f"scale={width}:{height},format=yuv420p",
-                "-c:v", "libx264", "-preset", "ultrafast", "-r", "2",
-                "-c:a", "aac", "-b:a", "192k",
-                "-shortest",
-                str(out_path),
-            ],
-            step=f"render order {segment['order']} (single page)",
-        )
+        with tempfile.TemporaryDirectory(prefix="render_prescale_") as prescale_tmp:
+            scaled_image = _prescale_image(
+                page["image_path"], width, height,
+                Path(prescale_tmp), f"order{segment['order']}",
+            )
+            _run_ffmpeg(
+                [
+                    "-loop", "1", "-r", "2", "-i", str(scaled_image),
+                    "-i", str(audio_path),
+                    "-t", f"{page['duration_seconds']:.3f}",
+                    "-vf", "format=yuv420p",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-r", "2",
+                    "-c:a", "aac", "-b:a", "192k",
+                    "-shortest",
+                    str(out_path),
+                ],
+                step=f"render order {segment['order']} (single page)",
+            )
         return
 
     # Multi-page: render each page as a silent hold clip, concat them
@@ -325,11 +358,15 @@ def _render_segment(segment: dict, out_path: Path) -> None:
         page_clips = []
         for idx, page in enumerate(pages, start=1):
             clip_path = page_tmp_dir / f"page_{idx:02d}.mp4"
+            scaled_image = _prescale_image(
+                page["image_path"], width, height,
+                page_tmp_dir, f"order{segment['order']}_page{idx}",
+            )
             _run_ffmpeg(
                 [
-                    "-loop", "1", "-r", "2", "-i", str(page["image_path"]),
+                    "-loop", "1", "-r", "2", "-i", str(scaled_image),
                     "-t", f"{page['duration_seconds']:.3f}",
-                    "-vf", f"scale={width}:{height},format=yuv420p",
+                    "-vf", "format=yuv420p",
                     "-c:v", "libx264", "-preset", "ultrafast", "-r", "2", "-an",
                     str(clip_path),
                 ],
